@@ -3,6 +3,15 @@ const fs = require('fs');
 const client = new Discord.Client();
 
 global.downGames = {};
+global.lastDownMessageIds = [];
+
+const pushDownMessageIds = (id) => {
+  global.lastDownMessageIds.push(id);
+
+  if (global.lastDownMessageIds.length > 5) {
+    global.lastDownMessageIds.pop();
+  }
+};
 
 const scuffedDataInitial = {
   leagueoflegends: { label:"League of Legends", minPlayers: 5, users: {}},
@@ -94,8 +103,7 @@ const downCommand = (args, msg) => {
 
         if (minutes <= 0) {
           delete game.users[msg.author.id];
-
-          console.log(game.users);
+          msg.react('✅');
         } else {
           // Indicating that they are down to game.
           game.users[msg.author.id] = {
@@ -103,10 +111,12 @@ const downCommand = (args, msg) => {
             minutes: Math.min(minutes, 1440),
             dateSet: new Date(),
           };
+          pushDownMessageIds(msg.id);
+          msg.react('✅');
+          msg.react('➕');
         }
 
         updateScuffedDb();
-        msg.react('✅');
       }
     } else {
       // Checking who wants to game.
@@ -154,6 +164,7 @@ client.on('message', msg => {
   if (msg.content.startsWith('!')) {
     const args = msg.content.split(' ');
 
+
     if (commands[args[0]]) {
       commands[args[0]](args, msg);
     } else {
@@ -161,5 +172,27 @@ client.on('message', msg => {
     }
   }
 });
- 
+
+const onReaction = (isAdd, messageReaction, user) => {
+  if (client.user.id === user.id) { return; }
+
+  if (messageReaction.emoji.toString() === '➕' && global.lastDownMessageIds.includes(messageReaction.message.id)) {
+    const [_, gameName, minutes] = messageReaction.message.content.split(' ');
+    const game = global.downGames[getCanonicalGame(gameName)];
+
+    if (isAdd) {
+      game.users[user.id] = {
+        displayName: messageReaction.message.member.displayName,
+        minutes: Math.min(minutes, 1440),
+        dateSet: new Date(),
+      };
+    } else {
+      delete game.users[user.id];
+    }
+  }
+}
+
+client.on("messageReactionAdd", (messageReaction, user) => { onReaction(true, messageReaction, user); });
+client.on("messageReactionRemove", (messageReaction, user) => { onReaction(false, messageReaction, user); });
+
 client.login('Nzk0MTA1ODQ2NDY0MTE4ODA0.X-1-sw.BtpLz-9Foq-3d9VusCD-1qMEn74');
