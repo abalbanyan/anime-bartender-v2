@@ -107,7 +107,7 @@ const downCommand = (args, msg) => {
         } else {
           // Indicating that they are down to game.
           game.users[msg.author.id] = {
-            displayName: msg.member.displayName,
+            displayName: msg.author.username, //msg.member.displayName,
             minutes: Math.min(minutes, 1440),
             dateSet: new Date(),
           };
@@ -182,7 +182,7 @@ const onReaction = (isAdd, messageReaction, user) => {
 
     if (isAdd) {
       game.users[user.id] = {
-        displayName: messageReaction.message.member.displayName,
+        displayName: user.username,
         minutes: Math.min(minutes, 1440),
         dateSet: new Date(),
       };
