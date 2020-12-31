@@ -52,9 +52,12 @@ const updateScuffedData = () => {
 const getCanonicalGame = (game) => {
   const gameLowercase = game.toLowerCase();
   const leagueoflegends = ['league', 'leg', 'leagueoflegends', 'leag', 'lol', 'legos', 'legoslosgandos'];
+  const amongus = ['amongus', 'amoong', 'amoongus', 'au'];
 
   if (leagueoflegends.includes(gameLowercase)) {
     return 'leagueoflegends';
+  } else if (amongus.includes(gameLowercase)) {
+    return 'amongus';
   } else {
     return null;
   }
@@ -98,8 +101,24 @@ const downCommand = (args, msg) => {
           const gamersFormatted = gamers.reduce((gamersFormattedPrev, { userId }) => `${gamersFormattedPrev} <@${userId}>`, '');
           msg.channel.send(`(${game.label}) Gamers, assemble. ${gamersFormatted}`);
         }
-      } else if (!isNaN(args[2])) {
-        const minutes = parseFloat(args[2]);
+      } else {
+        let time = args[2];
+
+        const unit = time[time.length - 1];
+        if (unit == 'm' || unit === 'h') {
+          time = time.substring(0, time.length - 1);
+        }
+
+        if (isNaN(time)) {
+          msg.reply(`Invalid number and/or time unit.`);
+          return;
+        }
+
+        let minutes = parseFloat(time);
+
+        if (unit === 'h') {
+          minutes = minutes * 60;
+        }
 
         if (minutes <= 0) {
           delete game.users[msg.author.id];
@@ -122,7 +141,7 @@ const downCommand = (args, msg) => {
       // Checking who wants to game.
       const gamers = downGamers(gameName);
       if (gamers.length >= 1) {
-        let gamersFormatted = gamers.reduce((gamersFormattedPrev, { userId, displayName, minutesLeft }) => `${gamersFormattedPrev}${displayName} (${Math.ceil(minutesLeft)} min${Math.ceil(minutesLeft) === 1 ? '' : 's'}), `, '');
+        let gamersFormatted = gamers.reduce((gamersFormattedPrev, { userId, displayName, minutesLeft }) => `${gamersFormattedPrev}${displayName} (${Math.floor(minutesLeft / 60)}h ${Math.floor(minutesLeft % 60)}m), `, '');
         gamersFormatted = gamersFormatted.substring(0, gamersFormatted.length - 2);
 
         let msgFormatted = ''; 
