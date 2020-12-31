@@ -144,6 +144,9 @@ const downCommand = (args, msg) => {
         let gamersFormatted = gamers.reduce((gamersFormattedPrev, { userId, displayName, minutesLeft }) => `${gamersFormattedPrev}${displayName} (${Math.floor(minutesLeft / 60)}h ${Math.floor(minutesLeft % 60)}m), `, '');
         gamersFormatted = gamersFormatted.substring(0, gamersFormatted.length - 2);
 
+        gamersFormatted = gamersFormatted.replace(/0h /g , '');
+        gamersFormatted = gamersFormatted.replace(/\(0m\)/g, '(<1m)');
+
         let msgFormatted = ''; 
 
         if (gamers.length === 1) {
