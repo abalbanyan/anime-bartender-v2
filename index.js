@@ -53,15 +53,21 @@ const getCanonicalGame = (game) => {
 
 /**
  * Returns the list of gamers down to play gameName.
- * @param {string} gameName 
+ * @param {string} gameName
+ * @returns {object[]} gamers
  */
 const downGamers = (gameName) => {
   const game = global.downGames[gameName];
   
-  return Object.entries(game.users).filter(([userId, { minutes, dateSet }]) => {
+  return Object.entries(game.users).reduce((gamers, [userId, { minutes, dateSet, displayName }]) => {
     const minutesPassed = Math.abs(new Date() - new Date(dateSet)) / 1000 / 60;
-    return minutesPassed <= minutes;
-  });
+    const minutesLeft = minutes - minutesPassed;
+    if (minutesPassed <= minutes) {
+      return [...gamers, { userId, minutesLeft, displayName }];
+    } else {
+      return gamers;
+    }
+  }, []);
 };
 
 const downCommand = (args, msg) => {
@@ -80,8 +86,8 @@ const downCommand = (args, msg) => {
         // Ping gamers.
         const gamers = downGamers(gameName);
         if (gamers.length >= 1) {
-          const gamersFormatted = gamers.reduce((gamersFormattedPrev, [userId, { tag }]) => `${gamersFormattedPrev} <@${userId}>`, '');
-          msg.channel.send(`(${game.label}) Gamers, assemble. ${gamersFormatted}.`);
+          const gamersFormatted = gamers.reduce((gamersFormattedPrev, { userId }) => `${gamersFormattedPrev} <@${userId}>`, '');
+          msg.channel.send(`(${game.label}) Gamers, assemble. ${gamersFormatted}`);
         }
       } else if (!isNaN(args[2])) {
         const minutes = parseFloat(args[2]);
@@ -93,8 +99,7 @@ const downCommand = (args, msg) => {
         } else {
           // Indicating that they are down to game.
           game.users[msg.author.id] = {
-            username: msg.author.username,
-            tag: msg.author.tag,
+            displayName: msg.member.displayName,
             minutes: Math.min(minutes, 1440),
             dateSet: new Date(),
           };
@@ -107,7 +112,8 @@ const downCommand = (args, msg) => {
       // Checking who wants to game.
       const gamers = downGamers(gameName);
       if (gamers.length >= 1) {
-        const gamersFormatted = gamers.reduce((gamersFormattedPrev, [userId, { username, minutes }]) => `${gamersFormattedPrev}, ${username} (${minutes} mins)`, '');
+        let gamersFormatted = gamers.reduce((gamersFormattedPrev, { userId, displayName, minutesLeft }) => `${gamersFormattedPrev}${displayName} (${Math.ceil(minutesLeft)} min${Math.ceil(minutesLeft) === 1 ? '' : 's'}), `, '');
+        gamersFormatted = gamersFormatted.substring(0, gamersFormatted.length - 2);
 
         let msgFormatted = ''; 
 
