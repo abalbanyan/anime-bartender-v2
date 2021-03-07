@@ -2,20 +2,25 @@ const Discord = require('discord.js');
 const fs = require('fs');
 const client = new Discord.Client();
 
+process.title = 'Anime Bartender';
+
 global.downGames = {};
 global.lastDownMessageIds = [];
+
+const numberEmojis = ['0️⃣','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣'];
 
 const pushDownMessageIds = (id) => {
   global.lastDownMessageIds.push(id);
 
   if (global.lastDownMessageIds.length > 5) {
-    global.lastDownMessageIds.pop();
+    global.lastDownMessageIds.shift();
   }
 };
 
 const scuffedDataInitial = {
   leagueoflegends: { label:"League of Legends", minPlayers: 5, users: {}},
   amongus: { label: "Among Us", minPlayers: 8, users: {} },
+  valheim: { label:"Valheim", minPlayers: 5, users: {}},
 };
 
 const updateScuffedDb = () => {
@@ -53,14 +58,38 @@ const getCanonicalGame = (game) => {
   const gameLowercase = game.toLowerCase();
   const leagueoflegends = ['league', 'leg', 'leagueoflegends', 'leag', 'lol', 'legos', 'legoslosgandos'];
   const amongus = ['amongus', 'amoong', 'amoongus', 'au'];
+  const valheim = ['valheim'];
 
   if (leagueoflegends.includes(gameLowercase)) {
     return 'leagueoflegends';
   } else if (amongus.includes(gameLowercase)) {
     return 'amongus';
+  } else if (valheim.includes(gameLowercase)) {
+    return 'valheim';
   } else {
     return null;
   }
+}
+
+
+const parseMinutes = (time) => {
+  const unit = time[time.length - 1];
+
+  if (unit == 'm' || unit === 'h') {
+    time = time.substring(0, time.length - 1);
+  }
+
+  if (isNaN(time)) {
+    return null;
+  }
+
+  let minutes = parseFloat(time);
+
+  if (unit === 'h') {
+    minutes = minutes * 60;
+  }
+
+  return minutes;
 }
 
 /**
@@ -72,9 +101,10 @@ const downGamers = (gameName) => {
   const game = global.downGames[gameName];
   
   return Object.entries(game.users).reduce((gamers, [userId, { minutes, dateSet, displayName }]) => {
-    const minutesPassed = Math.abs(new Date() - new Date(dateSet)) / 1000 / 60;
+    const minutesPassed = (new Date() - new Date(dateSet)) / 1000 / 60; // This can be negative, if dateSet is in future.
     const minutesLeft = minutes - minutesPassed;
-    if (minutesPassed <= minutes) {
+
+    if (minutesPassed >= 0 && minutesPassed <= minutes) {
       return [...gamers, { userId, minutesLeft, displayName }];
     } else {
       return gamers;
@@ -102,37 +132,34 @@ const downCommand = (args, msg) => {
           msg.channel.send(`(${game.label}) Gamers, assemble. ${gamersFormatted}`);
         }
       } else {
-        let time = args[2];
+        const minutes = parseMinutes(args[2]);
+        const delay = args[3] ? parseMinutes(args[3]) : 0;
 
-        const unit = time[time.length - 1];
-        if (unit == 'm' || unit === 'h') {
-          time = time.substring(0, time.length - 1);
-        }
-
-        if (isNaN(time)) {
+        if (minutes === null || delay == null) {
           msg.reply(`Invalid number and/or time unit.`);
           return;
-        }
-
-        let minutes = parseFloat(time);
-
-        if (unit === 'h') {
-          minutes = minutes * 60;
         }
 
         if (minutes <= 0) {
           delete game.users[msg.author.id];
           msg.react('✅');
         } else {
+          const dateSet = new Date()
+          dateSet.setMinutes(dateSet.getMinutes() + delay);
+
           // Indicating that they are down to game.
           game.users[msg.author.id] = {
             displayName: msg.author.username, //msg.member.displayName,
-            minutes: Math.min(minutes, 1440),
-            dateSet: new Date(),
+            minutes: Math.min(minutes, 480),
+            dateSet: dateSet
           };
           pushDownMessageIds(msg.id);
+
+          const gamers = downGamers(gameName);
+
           msg.react('✅');
-          msg.react('➕');
+          msg.react('⬇️');
+          msg.react(numberEmojis[Math.min(gamers.length, numberEmojis.length - 1)]);
         }
 
         updateScuffedDb();
@@ -198,19 +225,22 @@ client.on('message', msg => {
 const onReaction = (isAdd, messageReaction, user) => {
   if (client.user.id === user.id) { return; }
 
-  if (messageReaction.emoji.toString() === '➕' && global.lastDownMessageIds.includes(messageReaction.message.id)) {
-    const [_, gameName, minutes] = messageReaction.message.content.split(' ');
+  if (messageReaction.emoji.toString() === '⬇️' && global.lastDownMessageIds.includes(messageReaction.message.id)) {
+    const [_, gameName, time] = messageReaction.message.content.split(' ');
     const game = global.downGames[getCanonicalGame(gameName)];
+    const minutes = parseMinutes(time);
 
     if (isAdd) {
       game.users[user.id] = {
         displayName: user.username,
-        minutes: Math.min(minutes, 1440),
+        minutes: Math.min(minutes, 480),
         dateSet: new Date(),
       };
     } else {
       delete game.users[user.id];
     }
+
+    updateScuffedDb();
   }
 }
 
