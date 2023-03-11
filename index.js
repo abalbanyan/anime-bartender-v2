@@ -1,6 +1,12 @@
 const Discord = require('discord.js');
+const { Configuration, OpenAIApi } = require("openai");
 const fs = require('fs');
 const client = new Discord.Client();
+
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_TOKEN,
+});
+const openai = new OpenAIApi(configuration);
 
 process.title = 'Anime Bartender';
 
@@ -21,6 +27,7 @@ const scuffedDataInitial = {
   leagueoflegends: { label:"League of Legends", minPlayers: 5, users: {}},
   amongus: { label: "Among Us", minPlayers: 8, users: {} },
   valheim: { label:"Valheim", minPlayers: 5, users: {}},
+  valorant: { label:"Valorant", minPlayers: 5, users: {}},
 };
 
 const updateScuffedDb = () => {
@@ -59,6 +66,7 @@ const getCanonicalGame = (game) => {
   const leagueoflegends = ['league', 'leg', 'leagueoflegends', 'leag', 'lol', 'legos', 'legoslosgandos'];
   const amongus = ['amongus', 'amoong', 'amoongus', 'au'];
   const valheim = ['valheim'];
+  const valorant = ['val', 'valorant'];
 
   if (leagueoflegends.includes(gameLowercase)) {
     return 'leagueoflegends';
@@ -66,6 +74,8 @@ const getCanonicalGame = (game) => {
     return 'amongus';
   } else if (valheim.includes(gameLowercase)) {
     return 'valheim';
+  } else if (valorant.includes(gameLowercase)) {
+    return 'valorant';
   } else {
     return null;
   }
@@ -115,6 +125,11 @@ const downGamers = (gameName) => {
 const downCommand = (args, msg) => {
   if (args.length > 1) {
     const gameName = getCanonicalGame(args[1]);
+
+    if (args[1].toLowerCase() === 'content') {
+      msg.react('🖕');
+      return;
+    }
 
     if (!gameName || !global.downGames[gameName]) {
       msg.reply('No game with that title.');
@@ -202,6 +217,7 @@ const notImplementedCommand = (_, msg) => {
 
 const commands = {
   '!down': downCommand,
+  // '!help': notImplementedCommand,
 };
 
 client.on('ready', () => {
@@ -209,15 +225,48 @@ client.on('ready', () => {
   updateScuffedData();
 });
  
+
+// Event listener for incoming messages
+client.on('message', async (message) => {
+  if (['porn', 'terror', 'bomb', 'meth', 'cocaine'].some((word) => message.content.includes(word))) {
+    return;
+  }
+
+  // Check if the message was sent in the designated channel and is a question
+  if (
+    message.channel.id === '563503441356259328' &&
+    message.content.endsWith('?')
+  ) {
+    try {
+      openai.create
+      const completion = await openai.createCompletion({
+        model: "text-davinci-003",
+        prompt: message.content,
+        max_tokens: 100,
+        n: 1,
+        // stop: '\n',
+        temperature: 0.8,
+      });
+      console.log(completion.data);
+      if (completion.data?.choices[0]?.finish_reason === 'length') {
+        message.channel.send('eh.');
+      } else if (completion.data?.choices[0]?.text) {
+        message.channel.send(completion.data.choices[0].text);
+      }
+    } catch (error) {
+      console.error(error);
+      // message.channel.send('Oops! Something went wrong.');
+    }
+  }
+});
+
+
 client.on('message', msg => {
   if (msg.content.startsWith('!')) {
     const args = msg.content.split(' ');
 
-
     if (commands[args[0]]) {
       commands[args[0]](args, msg);
-    } else {
-      notImplementedCommand(args, msg);
     }
   }
 });
@@ -247,4 +296,4 @@ const onReaction = (isAdd, messageReaction, user) => {
 client.on("messageReactionAdd", (messageReaction, user) => { onReaction(true, messageReaction, user); });
 client.on("messageReactionRemove", (messageReaction, user) => { onReaction(false, messageReaction, user); });
 
-client.login('Nzk0MTA1ODQ2NDY0MTE4ODA0.X-1-sw.BtpLz-9Foq-3d9VusCD-1qMEn74');
+client.login(process.env.DISCORD_TOKEN);

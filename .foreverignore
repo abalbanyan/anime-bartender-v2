@@ -1,0 +1,6 @@
+.gitignore
+scuffedDatabase.json
+yarn-error.log
+yarn.lock
+node_modules
+package.json
